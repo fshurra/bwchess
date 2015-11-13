@@ -1,6 +1,6 @@
 # this is the bwchess game it self
 #the game is a 8x8 one
-
+import copy
 
 class BWGame:
     # in the game the -1 empty 0 white 1 black
@@ -19,20 +19,20 @@ class BWGame:
             self.game.append(line)
         
         self.count = 1
-        self.player = [["player1",1],["player2",0]]
+        self.player = [[player1,1],[player2,0]]
         #need to add the chosing b/w here
         self.game[3][3] = 1
         self.game[4][4] = 1
         self.game[3][4] = 0
         self.game[4][3] = 0
-        self.prevgame = self.game
+        self.prevgame = copy.deepcopy(self.game)
         self.hist = []
               
     def put(self,x,y,color):
         # x, y in the range of the game yard and the player is 0 or 1
         # if illegal to put return 2
         # if it is using the #pass the x and y should be -1,-1
-        self.prevgame = self.game
+        self.prevgame = copy.deepcopy(self.game)
         if x == -1:
             #PASS
             self.count+=1
@@ -45,9 +45,9 @@ class BWGame:
         # backup the previous
         # get the color of the player who put here
         self.game[x][y] = color
-        self.count+=1
         count = self.count
         self.hist.append([count,x,y,color])
+        self.count+=1
         #refresh the game to the after turning
         self.afterput(x,y,color)
         return 1
@@ -55,23 +55,54 @@ class BWGame:
     def unput(self):
         # restore the game into the previous situation
         unputed = self.hist.pop()
-        self.game = self.prevgame
+        self.game = copy.deepcopy(self.prevgame)
         return unputed
+    
+    def checkturning(self,x,y,color):
+        # returning the turning direction number to put an color in the xy place
+        dirs = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]
+        changed = 0 #it is still changed direction now
+        # using width searching here to judge the afterput situation
+        nextdirs = copy.deepcopy(dirs)
+        for i in range(1,8):
+            prevdirs = nextdirs
+            nextdirs = []
+            for dir in prevdirs:
+                _x = x
+                _y = y
+                _x += i*dir[0]
+                _y += i*dir[1]
+                if (_x<0 or _x>7) or (_y<0 or _y>7):
+                    continue
+                if self.game[_x][_y] == -1:
+                    continue
+                if self.game[_x][_y] == color:
+                    changed+=1
+                    #here is from the turning one ,may have better one to do this
+                    continue
+                nextdirs.append(dir)
+        return changed
     
     def checkposition(self,x,y,color):
         # will return the chess number -1,0,1
         # and sth else to make sure the position is good for putting
         # if good return -1(means empty) 
+        # illegal point will return other
         posinf = self.game[x][y]
+        turnings = self.checkturning(x, y, color)
+        if turnings == 0:
+            return 2
         return posinf
     
     def turnbetween(self,x,y,_x,_y,color,dir):    
+        x0 = x
+        y0 = y
         while(True):
-            __x = x + dir[0]
-            __y = y + dir[1]
-            if __x == _x:
+            x0 += dir[0]
+            y0 += dir[1]
+            if x0 == _x and y0 == _y:
                 break;
-            self.game[__x][__y] = color
+            self.game[x0][y0] = color
         return 1
     
     def afterput(self,x,y,color):
@@ -79,24 +110,46 @@ class BWGame:
         dirs = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]
         changed = 0 #it is still changed direction now
         # using width searching here to judge the afterput situation
+        nextdirs = copy.deepcopy(dirs)
         for i in range(1,8):
-            for dir in dirs:
+            prevdirs = nextdirs
+            nextdirs = []
+            for dir in prevdirs:
                 _x = x
                 _y = y
-                _x += dirs[0]*i
-                _y += dirs[1]*i
+                _x += i*dir[0]
+                _y += i*dir[1]
                 if (_x<0 or _x>7) or (_y<0 or _y>7):
                     #position out delet the direction
-                    dirs.remove(dir)
+                    #dirs.remove(dir)
+                    continue
                 if self.game[_x][_y] == -1:
-                    dirs.remove(dir)
+                    #dirs.remove(dir)
+                    continue
                 if self.game[_x][_y] == color:
                     #get a same then turning and end this dir
                     changed+=1
                     self.turnbetween(x,y,_x,_y,color,dir)
-                    dirs.remove(dir)
+                    #dirs.remove(dir)
+                    continue
+                nextdirs.append(dir)
         return changed
         
     def getgame(self):
         #returning the game matrix
         return self.game
+    def show(self):
+        #for debugging usage
+        for line in self.game:
+            print line
+            
+            
+if __name__ =="__main__":
+    b = BWGame("p1","p2")
+    b.put(0,0,1)
+    b.show()
+    b.put(0,1,0)
+    b.show()
+    b.put(0,2,1)
+    b.show()
+    print b.count
