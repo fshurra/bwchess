@@ -10,6 +10,12 @@ class BWGame:
     # count   acturall it is the round of this play
     # hist
     # player
+    '''
+    game()         #The chess play
+    put(row,column,color)
+    checkposition(row,column,color)
+    show()
+    '''
     def __init__(self,player1,player2):
         self.game = [];
         for i in range(8):
@@ -140,16 +146,26 @@ class BWGame:
         return self.game
     def show(self):
         #for debugging usage
-        for line in self.game:
+        showing = copy.deepcopy(self.game)
+        for line in showing:
+            print line
+        for i in range(len(showing)):
+            for j in range(len(showing[i])):
+                if showing[i][j] == -1:
+                    showing[i][j] = 8
+        for line in showing:
             print line
             
             
 if __name__ =="__main__":
     b = BWGame("p1","p2")
+    b.show()
     b.put(0,0,1)
     b.show()
     b.put(0,1,0)
     b.show()
     b.put(0,2,1)
+    b.show()
+    b.put(3,2,0)
     b.show()
     print b.count
