@@ -8,7 +8,7 @@ class Clientissue:
         self.ADDR_S = ADDR_S
         self.sendingqueue = sendingqueue
         self.logined = 0
-        self.inroom = 0
+        self.inroom = ""
         self.playing = 0
         self.id = ''
         self.server_addr = ()
@@ -18,7 +18,8 @@ class Clientissue:
                            "MSG": self.msg_receive,
                            "KO" : self.knocked_out,
                            "JSON": self.show_json,
-                           "LOGIN" : self.receive_login
+                           "LOGIN" : self.receive_login,
+                           "JOIN" :  self.receive_join
                            }
         #HERE ARE THE LOCALCMDS
         self.local_cmd = {
@@ -34,6 +35,13 @@ class Clientissue:
     #check all games every time
     
     #NET OPENRATION
+    def receive_join(self,*args):
+        msg = args[0]
+        name = msg[1]
+        print "Joined",name
+        self.inroom = name
+        return 0
+    
     def receive_login(self,*args):
         msg = args[0]
         id = msg[1]
@@ -50,13 +58,18 @@ class Clientissue:
         
     def msg_receive(self,*args):
         msg = args[0]
-        print "MSG_RECEIVED:",msg[1]
+        s = ''
+        if msg[2] == "!":
+            s = 'Server'
+        else:
+            s = msg[2]
+        print "MSG_RECEIVED:",msg[1]," From:",s
         return 0
     
     def knocked_out(self,*args):
-        self.inroom = 0
         msg = args[0]
         print msg[1]
+        self.resetall()
         return 0
     
     #LOCAL OPERATION
@@ -74,19 +87,33 @@ class Clientissue:
         return 1
     
     def client_logout(self,*args):
+        msg = args[0]
+        id = self.id
+        if id == '':
+            print 'You have not login'
+        else:
+            self.send("LOGOUT|"+id+"|#",self.server_addr)
+            self.id = ''
         return 0
     
     def client_list(self,*args):
-        
+        print "Show the list:"
+        self.send("LIST|#",self.server_addr)
         return 0
         
     def client_games(self,*args):
+        print "Show the games:"
+        self.send("GAMES|#",self.server_addr)
         return 0
         
     def client_join(self,*args):
+        msg = args[0]
+        name = msg[1]
+        self.send("JOIN|"+name+"|#",self.server_addr)
         return 0
-    
-    def client_msg(self):
+    # msg content d1,d2,d3
+    def client_msg(self,*args):
+        msg = args[0]
         return 0
     
     def stop_client(self,*args):
@@ -96,11 +123,18 @@ class Clientissue:
         #self.send("@",self.ADDR_L)
         return '@'
     
+    def resetall(self):
+        self.logined = 0
+        self.inroom = 0
+        self.playing = 0
+        self.id = ''
+        self.server_addr = ()
+    
     def send(self,str,addr):
         msg = [str,addr]
-        print self.sendingqueue
-        #print "Sending:",msg
+        #print self.sendingqueue
+        print "Sending:",msg
         self.sendlock.acquire()
-        self.sendingqueue.put = (msg)
+        self.sendingqueue.put(msg)
         self.sendlock.release()
         return 0

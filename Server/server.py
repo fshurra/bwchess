@@ -24,7 +24,7 @@ def sending(queue,ADDR_SENDING):
     net = NetworkUDP(ADDR_SENDING)
     while True:
         msg = queue.get()
-        print "sending ",msg
+        #print "sending ",msg
         if net.sending(msg[0], msg[1])==False:
             print "send",msg,"failed"
         print "Send Success",msg
