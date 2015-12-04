@@ -31,13 +31,15 @@ class Serverissue:
                            "test" : self.test,
                            "opengame" : self.opengame,
                            "closegame" : self.closegame,
-                           "reset-all" : self.resetall
+                           "reset-all" : self.resetall,
+                           'kick' : self.kickplayer
                           }
         self.errormsg = {
                          "PLAYER_FULL": "MSG|The Server is Full|!",
                          "KICKED_OUT": "KO|You have been kicked out|!",
                          "LOGIN_SUCCESS": "MSG|Login Success|!",
-                         "LOGOUT_SUCCESS": "MSG|Logged Out|!"
+                         "LOGOUT_SUCCESS": "MSG|Logged Out|!",
+                         "LOGINED" : 'MSG|You Have Already Login!|!'
                          }
     #check all games every time
     def everygame(self):
@@ -54,13 +56,18 @@ class Serverissue:
         addr[1] = addr[1] - 1
         addr = tuple(addr)
         name = msg[1]
+        oid = self.playerexist(addr)
+        if oid != -1:
+            self.send(self.errormsg['LOGINED'],addr)
+            self.send("LOGIN|"+oid+'|!',addr)
+            return 0
         id = self.getid()
         if id == -1:
             self.send(self.errormsg["PLAYER_FULL"],addr)
             print "PLAYER_FULL"
         self.idtoinfo[id] = [addr,name,"IDLE"]
         self.id.append(id)
-        print 'login',player
+        #print 'login',player
         self.send(self.errormsg["LOGIN_SUCCESS"],addr)
         self.send("LOGIN|"+id+'|!',addr)
         #print self.errormsg["LOGIN_SUCCESS"]
@@ -69,9 +76,9 @@ class Serverissue:
     def server_logout(self,*args):
         msg = args[0]
         id = msg[1]
-        addr = msg[-1]
-        player = self.delplayer(id)
-        print 'logout',player
+        addr = self.idtoinfo[id][0]
+        self.delplayer(id)
+        print 'logout',id
         self.send(self.errormsg["LOGOUT_SUCCESS"],addr)
         return 0
     
@@ -84,11 +91,22 @@ class Serverissue:
             item.append(key)
             plist.append(item)
         plist_json = json.dumps(plist)
-        self.send("JSON|"+plist_json+"|!",addr)  
+        self.send("JSON|"+plist_json+"|!",self.addr_change(addr))  
         print 'list'
         return 0
         
     def server_games(self,*args):
+        msg = args[0]
+        addr = msg[-1]
+        plist = []
+        #emptygame["name",[id1,id2],[color1,color2],[retry1,retry2],roundnow,[the list of operation]]
+        for game in self.gameinfo:
+            info = []
+            info.append(game[0])
+            info.append(game[1])
+            plist.append(info)
+        plist_json = json.dumps(plist)
+        self.send("JSON|"+plist_json+"|!",self.addr_change(addr))  
         print 'games'
         return 0
         
@@ -106,6 +124,18 @@ class Serverissue:
         self.idtoinfo = {}
         self.gameinfo = []
         self.id = []
+    
+    def kickplayer(self,*args):
+        msg = args[0]
+        playerid = str(args[1])
+        if playerid not in self.idtoinfo:
+            print 'Not Exist ',playerid
+            return 0
+        else:
+            self.send(self.errormsg["KICKED_OUT"],self.idtoinfo[playerid][0])
+            self.delplayer(playerid)
+            print 'Kicked Out',playerid
+            return 0
         
     def closegame(self,*args):
         command = args[0]
@@ -139,6 +169,7 @@ class Serverissue:
             self.gameinfo.append([name,[-1,-1],[8,8],[0,0],0,[]])
             print 'Open Success'
         return 0
+    
     def stop_server(self,*args):
         print 'stopping Server'
         #print self.sendingqueue
@@ -152,12 +183,14 @@ class Serverissue:
     
     def test(self,*args):
         #self.playerlist.append(1000)
-        print self.gameinfo,self.playerlist,self.idtoinfo
+        print self.gameinfo,self.playerlist,self.idtoinfo,self.id
         return 0
 
     #INTERNAL FUNC
+    
     def delplayer(self,id):
         del self.idtoinfo[id]
+        self.id.pop(self.id.index(id))
         return 0
     
     def getid(self):
@@ -172,8 +205,19 @@ class Serverissue:
     def send(self,str,addr):
         msg = (str,addr)
         #print "Sending:",msg
-        self.sendingqueue.put = (msg)
-        
+        self.sendingqueue.put(msg)
+    
+    def playerexist(self,addr):
+        for key in self.idtoinfo:
+            if addr in self.idtoinfo[key]:
+                return key
+        return -1
+    
+    def addr_change(self,addr):
+        addr = list(addr)
+        addr[1] -= 1
+        return tuple(addr)
+    
     def gameexist(self,name):
         if self.ROOM_NUM <= len(self.gameinfo):
             return self.ROOM_NUM + 1

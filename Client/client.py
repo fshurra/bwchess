@@ -1,5 +1,5 @@
 import threading as mp
-import Queue as q
+import multiprocessing as q
 from time import sleep
 from udpnetwork import NetworkUDP
 from clientclass import Clientissue as ccmd
@@ -31,7 +31,7 @@ def sending(queue,ADDR_SENDING,lock):
             if queue.empty() == False:
                 msg = queue.get()
                 lock.release()
-                print "sending ",msg
+                #print "sending ",msg
                 if net.sending(msg[0], msg[1]) == False:
                     print "send",msg,"failed"
                 print "Send Success",msg
@@ -60,8 +60,8 @@ def starting(queue,ADDR_LISTEN,ADDR_SENDING,listenqueue,sendingqueue,commandLock
                     ret = cmd.local_cmd[command[0]](command,0)
                     if ret == '@':
                         break
-                    else:
-                        print "Invalid Command"
+                else:
+                    print "Invalid Command"
             else:
                 commandLock.release()
             #print command
