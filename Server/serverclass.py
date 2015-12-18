@@ -22,7 +22,11 @@ class Serverissue:
                            "LIST" : self.server_list,
                            "GAMES" : self.server_games,
                            "JOIN" : self.server_join,
-                           "MSG" : self.server_msg
+                           "MSG" : self.server_msg,
+                           
+                           "PUT":self.server_put,
+                           "PASS":self.server_pass,
+                           ""
                            }
         #HERE ARE THE LOCALCMDS
         self.local_cmd = {
@@ -34,6 +38,7 @@ class Serverissue:
                            "reset-all" : self.resetall,
                            'kick' : self.kickplayer
                           }
+        #some default message to send
         self.errormsg = {
                          "PLAYER_FULL": "MSG|The Server is Full|!",
                          "KICKED_OUT": "KO|You have been kicked out|!",
@@ -47,7 +52,6 @@ class Serverissue:
     
     #NETWORK FUNC
     def server_login(self,*args):
-        
         msg = args[0]
         player = []
         addr = msg[-1]
@@ -103,7 +107,7 @@ class Serverissue:
         for game in self.gameinfo:
             info = []
             info.append(game[0])
-            info.append(game[1])
+             info.append(game[1])
             plist.append(info)
         plist_json = json.dumps(plist)
         self.send("JSON|"+plist_json+"|!",self.addr_change(addr))  

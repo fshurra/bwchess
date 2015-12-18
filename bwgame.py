@@ -41,13 +41,15 @@ class BWGame:
         self.prevgame = copy.deepcopy(self.game)
         if x == -1:
             #PASS
+            print "PASS"
             self.count+=1
             count = self.count
             self.hist.append([count,x,y,color,"PASS"])
             return 0;
         
         if self.checkposition(x, y, color) != -1:
-            return -1;
+            print "Cannot put there"
+            return -1
         # backup the previous
         # get the color of the player who put here
         self.game[x][y] = color
@@ -67,7 +69,8 @@ class BWGame:
     def checkturning(self,x,y,color):
         # returning the turning direction number to put an color in the xy place
         dirs = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]
-        changed = 0 #it is still changed direction now
+        changed = 0 
+        #it is still changed direction now
         # using width searching here to judge the afterput situation
         nextdirs = copy.deepcopy(dirs)
         for i in range(1,8):
@@ -83,7 +86,9 @@ class BWGame:
                 if self.game[_x][_y] == -1:
                     continue
                 if self.game[_x][_y] == color:
-                    changed+=1
+                    if self.countturning(x,y,_x,_y,color,dir) == 0:
+                        continue
+                    changed += 1
                     #here is from the turning one ,may have better one to do this
                     continue
                 nextdirs.append(dir)
@@ -96,9 +101,23 @@ class BWGame:
         # illegal point will return other
         posinf = self.game[x][y]
         turnings = self.checkturning(x, y, color)
+        print turnings
         if turnings == 0:
             return 2
         return posinf
+    
+    def countturning(self,x,y,_x,_y,color,dir):
+        x0 = x
+        y0 = y
+        turncount = 0
+        while(True):
+            x0 += dir[0]
+            y0 += dir[1]
+            if x0 == _x and y0 == _y:
+                break;
+            turncount += 1
+            #self.game[x0][y0] = color
+        return turncount
     
     def turnbetween(self,x,y,_x,_y,color,dir):    
         x0 = x
@@ -112,7 +131,7 @@ class BWGame:
         return 1
     
     def afterput(self,x,y,color):
-        # to check the game situation and do the turning
+        # to check the game situation and do the turning 
         dirs = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]
         changed = 0 #it is still changed direction now
         # using width searching here to judge the afterput situation
@@ -144,6 +163,7 @@ class BWGame:
     def getgame(self):
         #returning the game matrix
         return self.game
+    
     def show(self):
         #for debugging usage
         showing = copy.deepcopy(self.game)
@@ -168,4 +188,5 @@ if __name__ =="__main__":
     b.show()
     b.put(3,2,0)
     b.show()
+    b.put(2,2,0)
     print b.count
