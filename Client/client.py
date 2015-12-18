@@ -3,6 +3,8 @@ import multiprocessing as q
 from time import sleep
 from udpnetwork import NetworkUDP
 from clientclass import Clientissue as ccmd
+import wx
+import clientGUI as gui
 
 
 def listening(queue,ADDR_LISTEN,lock):
@@ -40,8 +42,6 @@ def sending(queue,ADDR_SENDING,lock):
             else:
                 lock.release()
     return 
-
-
 
 def starting(queue,ADDR_LISTEN,ADDR_SENDING,listenqueue,sendingqueue,commandLock,sendLock,listenLock):
     
