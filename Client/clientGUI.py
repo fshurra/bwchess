@@ -3,12 +3,34 @@ import threading
 import sys,os
 from copy import deepcopy
 from time import sleep
-from bwgame import BWGame as Game
+from bwgame import BWGame
+from clientclass import ClientGame
 #from curses.ascii import DC1
 
+class WXThread(threading.Thread):
+    def __init__(self,threadnum,func,*funcargs):
+        threading.Thread.__init__(self)
+        self.threadNum = threadnum
+        self.func = func
+        self.funcargs = funcargs
+        self.stopflag = threading.Event()
+        
+    def run(self):
+        self.func(self.funcargs)
+     
+class new_input(wx.TextCtrl):
+    def __init__(self,parent, id, value,pos, size,background = "black", wordcolour = "yellow"):
+        style = wx.TE_RICH2 | wx.TE_PROCESS_ENTER
+        wx.TextCtrl.__init__(self, parent = parent, id= id, value = value, pos=pos,style = style, size=size, validator=wx.DefaultValidator)
+        self.setStyle(background,wordcolour)
+    def setStyle(self,background = "black", wordcolour = "yellow"):
+        #print 'setStyle of input'
+        self.SetBackgroundColour(background)
+        self.SetDefaultStyle(style = wx.TextAttr(wordcolour,background))
+        
 class new_std(wx.TextCtrl):
     def __init__(self,parent, id=-1, value='', pos=wx.DefaultPosition, size=wx.DefaultSize, name=wx.TextCtrlNameStr,background = "black", wordcolour = "yellow"):
-        style =  wx.TE_MULTILINE | wx.TE_RICH | wx.TE_READONLY
+        style =  wx.TE_MULTILINE | wx.TE_RICH #| wx.TE_READONLY
         wx.TextCtrl.__init__(self, parent = parent, id= id, value = value, pos=pos, size=size, style=style, validator=wx.DefaultValidator, name=name)
         self.setStyle(background,wordcolour)
         self.old_stdout=sys.stdout
@@ -28,24 +50,7 @@ class new_std(wx.TextCtrl):
         sys.stdout=self.old_stdout
         sys.stderr=self.old_stderr
 
-class WXThread(threading.Thread):
-    def __init__(self,threadnum,func,*funcargs):
-        threading.Thread.__init__(self)
-        self.threadNum = threadnum
-        self.func = func
-        self.funcargs = funcargs
-        self.stopflag = threading.Event()
-        
-    def run(self):
-        self.func(self.funcargs)
-     
-class BWchessApp(wx.App):
-    def OnInit(self):
-        style = (wx.MINIMIZE_BOX |wx.CLOSE_BOX | wx.CAPTION | wx.SYSTEM_MENU)
-        self.frame = MainFrame(parent = None, id = -1, title = u"BWchess", style = style)
-        self.frame.Show()
-        self.SetTopWindow(self.frame)
-        return True
+
 
 class Board(wx.Window):
     def __init__(self,parent,id,size = (300,300),pos = (0,0),gameinfo = [],frame = None):
@@ -99,7 +104,7 @@ class Board(wx.Window):
 
         
     def PaintNow(self,data):
-        print "print now"
+        #print "print now"
         dc = wx.ClientDC(self)
         self.draw(dc,data)
     def OnPaint(self,evt):
@@ -107,33 +112,61 @@ class Board(wx.Window):
         self.draw(dc,self.gameinfo)
         
 class MainFrame(wx.Frame):
-    def __init__(self,parent,id,title,style = wx.DEFAULT_FRAME_STYLE, size = (600,450),pos = (100,100)):
+    def __init__(self,parent,id,title,style = wx.DEFAULT_FRAME_STYLE, size = (600,450),pos = (100,100),queue = [],game = None):
         wx.Frame.__init__(self,parent = parent,id = id,title = title,style= style,size = size, pos = pos)
         panel = wx.Panel(self,-1)
-        self.game = Game("DEF1","DEF2")
+        self.commandqueue = queue
+        self.game = game
         self.board = Board(panel,-1,size = (275,274),pos = (0,0),gameinfo = self.game.getgame(),frame = self)
-        self.bu_click = wx.Button(panel,-1,"Test",size = (100,30),pos = (350,300))
-        self.shower = new_std(parent = panel,size = (250,300),pos = (310,0))
+        self.bu_click = wx.Button(panel,-1,"Test",size = (100,30),pos = (350,370))
+        self.shower = new_std(parent = panel,size = (325,274),pos = (275,0))
+        self.inputer = new_input(parent = panel,id = -1,value = '',size = (480,20),pos = (100,280))
+        self.text1 = wx.StaticText(panel,-1,"Command:",size = (65,20),pos = (20,280))
         self.color = 1
-        self.myturn = None
-        self.Bind(wx.EVT_BUTTON,self.OnClick_bu_click,self.bu_click)
         
+        self.myturn = None
+        self.clock = wx.Timer(self)
+        self.Bind(wx.EVT_BUTTON,self.OnClick_bu_click,self.bu_click)
+        self.Bind(wx.EVT_TEXT_ENTER,self.OnEnterText,self.inputer)
+        self.Bind(wx.EVT_TIMER,self.OnTimer,self.clock)
+        self.clock.Start(100)
+    
+    def OnEnterText(self,evt):
+        command = self.inputer.GetValue()
+        if command == '':
+            return 0
+        else:
+            self.commandqueue.put(command)
+        self.inputer.Clear()
+        self.inputer.setStyle()
+        print command
+        
+    def OnTimer(self,evt):
+        #pass
+        self.board.PaintNow(self.game.getgame())
         
     def OnClick_bu_click(self,evt):
-        self.board.PaintNow(self.game.getgame())
-    
-    def put(self,x,y):
-        if self.myturn == None:
-            print "Game not started"
-            return
-        if self.myturn != True:
-            print "Not your turn"
-            return
-        self.game.put(x, y, self.color)
-        self.board.PaintNow(self.game.getgame())
+        #self.refreshinfo()
+        pass
+        #self.board.PaintNow(self.game.getgame())
         
+    def put(self,x,y):
+        color = self.game.getmycolor()
+        self.commandqueue.put("put "+str(x)+" "+str(y)+" "+str(color))
+
+        
+class BWchessApp(wx.App):
+    def __init__(self,commandqueue,game):
+        wx.App.__init__(self)
+        self.commandqueue = commandqueue
+        style = (wx.MINIMIZE_BOX |wx.CLOSE_BOX | wx.CAPTION | wx.SYSTEM_MENU)
+        self.frame = MainFrame(parent = None, id = -1, title = u"BWchess", style = style, queue = self.commandqueue,game = game)
+        self.frame.Show()
+        self.SetTopWindow(self.frame)
+        #return True
 if __name__ == "__main__":
-    app = BWchessApp()
+    game = ClientGame()
+    app = BWchessApp([],game)
     #print"Before Main Loop"
     #os.system("echo off")
     app.MainLoop()
