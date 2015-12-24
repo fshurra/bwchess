@@ -2,10 +2,6 @@
 #the game is a 8x8 one
 import copy
 
-
-    
-
-
 class BWGame:
     # in the game the -1 empty 0 white 1 black
     # the vars here
@@ -52,6 +48,8 @@ class BWGame:
         # x, y in the range of the game yard and the player is 0 or 1
         # if illegal to put return 2
         # if it is using the #pass the x and y should be -1,-1
+        x = int(x)
+        y = int(y)
         self.prevgame = copy.deepcopy(self.game)
         if x == -1:
             #PASS
@@ -59,7 +57,7 @@ class BWGame:
             self.count+=1
             count = self.count
             self.hist.append([count,x,y,color,"PASS"])
-            return 0;
+            return 1;
         
         if self.checkposition(x, y, color) != -1:
             print "Cannot put there"
@@ -179,7 +177,7 @@ class BWGame:
         return self.game
     
     def show(self):
-        #for debugging usage
+        #for debugging usage (for server using)
         showing = copy.deepcopy(self.game)
         for line in showing:
             print line

@@ -41,7 +41,7 @@ def starting(queue,ADDR_LISTEN,ADDR_SENDING,ROOM_NUM,sendingqueue,listenqueue):
     cmd = scmd(ADDR_LISTEN,ADDR_SENDING,ROOM_NUM,playerlist,gameinfo,sendingqueue,listenqueue,n)
     print "Server Starting Success"
     while True:
-        sleep(0.1)
+        sleep(0.03)
         cmd.n += 1
         if queue.empty() == False:
             command = queue.get()
@@ -49,18 +49,22 @@ def starting(queue,ADDR_LISTEN,ADDR_SENDING,ROOM_NUM,sendingqueue,listenqueue):
             #print command
             if command[0] in cmd.local_cmd:
                 #print command[0]
-                ret = cmd.local_cmd[command[0]](command,0)
+                try:
+                    ret = cmd.local_cmd[command[0]](command,0)
+                except:
+                    print "Invalid Command"
+                    
                 if ret == '@':
                     break
             else:
-                print 'Not in'
+                #print 'Not in'
                 print "Invalid Command"
             
         if listenqueue.empty() == False:
             msg = listenqueue.get()
             # msg ==> list(msg) ==> msg.append(remote_addr)
             cmd.server_cmd[msg[0]](msg,0)
-        #cmd.everygame()    
+        cmd.everygame()    
     return 0
 # this will be the UI of the server
 if __name__ == "__main__":

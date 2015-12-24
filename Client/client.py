@@ -24,7 +24,7 @@ def listening(queue,ADDR_LISTEN,lock):
 # the udpSocket sending
 def sending(queue,ADDR_SENDING,lock):
     net = NetworkUDP(ADDR_SENDING)
-    print queue
+    #print queue
     while True:
         #print 'this is sending'
         sleep(0.1)
@@ -36,17 +36,18 @@ def sending(queue,ADDR_SENDING,lock):
                 #print "sending ",msg
                 if net.sending(msg[0], msg[1]) == False:
                     print "send",msg,"failed"
-                print "Send Success",msg
+                else:
+                    print "Send Success",msg
                 if msg[0][0] == '@':
                     break
             else:
                 lock.release()
     return 
 
-def starting(queue,ADDR_LISTEN,ADDR_SENDING,listenqueue,sendingqueue,commandLock,sendLock,listenLock):
+def starting(queue,ADDR_LISTEN,ADDR_SENDING,listenqueue,sendingqueue,commandLock,sendLock,listenLock,game):
     
-    cmd = ccmd(ADDR_LISTEN,ADDR_SENDING,sendingqueue,sendLock)
-    print "Client Starting Success"
+    cmd = ccmd(ADDR_LISTEN,ADDR_SENDING,sendingqueue,sendLock,game)
+    
     print sendingqueue
     while True:
         sleep(0.5)
@@ -56,8 +57,14 @@ def starting(queue,ADDR_LISTEN,ADDR_SENDING,listenqueue,sendingqueue,commandLock
                 commandLock.release()
                 command = command.split()
                 if command[0] in cmd.local_cmd:
+                    ret = ''
                 #print command[0]
-                    ret = cmd.local_cmd[command[0]](command,0)
+                    try:
+                        ret = cmd.local_cmd[command[0]](command,0)
+                    except Exception as e:
+                        print e
+                        print "Invalid Command"
+                        
                     if ret == '@':
                         break
                 else:
@@ -84,18 +91,21 @@ if __name__ == "__main__":
     ADDR_LISTEN = (ADDR,LISTEN)
     ADDR_SENDING = (ADDR,SEND)
     sendingqueue = q.Queue(30)
-    print sendingqueue
+    #print sendingqueue
     listenqueue = q.Queue(50)
     commandqueue = q.Queue(10)
     sendLock = mp.Lock()
     listenLock = mp.Lock()
     commandLock = mp.Lock()
+    game = gui.ClientGame()
     listenP = mp.Thread(target = listening, args = (listenqueue, ADDR_LISTEN,listenLock))
     sendingP = mp.Thread(target = sending, args = (sendingqueue, ADDR_SENDING,sendLock))
-    s = mp.Thread(target = starting, args = (commandqueue,ADDR_LISTEN,ADDR_SENDING,listenqueue,sendingqueue,commandLock,sendLock,listenLock))
+    s = mp.Thread(target = starting, args = (commandqueue,ADDR_LISTEN,ADDR_SENDING,listenqueue,sendingqueue,commandLock,sendLock,listenLock,game))
     s.start()
     listenP.start()
     sendingP.start()
+    #here is for console usage
+    '''
     while True:
         sleep(1)
         command = raw_input(">>>")
@@ -106,6 +116,17 @@ if __name__ == "__main__":
             sendingqueue.put(stopmsg)
             sendLock.release()
             break
+    '''
+    
+    app = gui.BWchessApp(commandqueue,game)
+    print "Client Starting Success"
+    app.MainLoop()
+    
+    commandqueue.put("stop")
+    stopmsg = ["@",ADDR_LISTEN]
+    sendLock.acquire()
+    sendingqueue.put(stopmsg)
+    sendLock.release()
     listenP.join()
     sendingP.join()
     s.join()
