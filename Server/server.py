@@ -4,7 +4,10 @@ import Queue as q
 from time import sleep
 from udpnetwork import NetworkUDP
 from serverclass import Serverissue as scmd
+import ConfigParser
 # the message list of the whole routine
+
+
 
 # the udpSocket receiving
 def listening(queue,ADDR_LISTEN):
@@ -20,14 +23,18 @@ def listening(queue,ADDR_LISTEN):
             break
     return 
 # the udpSocket sending
-def sending(queue,ADDR_SENDING):
+def sending(queue,ADDR_SENDING,commandqueue):
     net = NetworkUDP(ADDR_SENDING)
     while True:
         msg = queue.get()
         #print "sending ",msg
         if net.sending(msg[0], msg[1])==False:
             print "send",msg,"failed"
-        print "Send Success",msg
+            cmd = ["disconnect",str(msg[1][0]),str(msg[1][1])]
+            cmd = " ".join(cmd)
+            commandqueue.put(cmd)
+        else:
+            print "Send Success",msg
         if msg[0][0] == '@':
             break
     return 
@@ -40,18 +47,29 @@ def starting(queue,ADDR_LISTEN,ADDR_SENDING,ROOM_NUM,sendingqueue,listenqueue):
     #Starting the server
     cmd = scmd(ADDR_LISTEN,ADDR_SENDING,ROOM_NUM,playerlist,gameinfo,sendingqueue,listenqueue,n)
     print "Server Starting Success"
+    count = 0
     while True:
-        sleep(0.03)
+        sleep(0.05)
+        count += 1
+        if count >= 20:
+            count = 0
+            #cmd.checkallconnection()
         cmd.n += 1
         if queue.empty() == False:
             command = queue.get()
             command = command.split()
+            if len(command) == 0:
+                continue
             #print command
+            ret = ''
             if command[0] in cmd.local_cmd:
-                #print command[0]
+                #print command
+                #ret = cmd.local_cmd[command[0]](command,0)
+                
                 try:
                     ret = cmd.local_cmd[command[0]](command,0)
-                except:
+                except Exception as e:
+                    print e
                     print "Invalid Command"
                     
                 if ret == '@':
@@ -64,15 +82,33 @@ def starting(queue,ADDR_LISTEN,ADDR_SENDING,ROOM_NUM,sendingqueue,listenqueue):
             msg = listenqueue.get()
             # msg ==> list(msg) ==> msg.append(remote_addr)
             cmd.server_cmd[msg[0]](msg,0)
-        cmd.everygame()    
+        cmd.everygame()
+    cmd.resetall()    
     return 0
 # this will be the UI of the server
 if __name__ == "__main__":
     print "Init the server starting"
     #starting Server issues
-    ADDRESS = '127.0.0.1'
-    PORT_LISTEN = 35000
-    PORT_SEND = 35001
+    try:
+        f = open("server.ini","r")
+        f.close()
+        conf = ConfigParser.ConfigParser()
+        conf.read("server.ini")
+        
+    except Exception as e:
+        f = open("server.ini","w")
+        conf = ConfigParser.ConfigParser()
+        conf.add_section("setting")
+        conf.set("setting","s_addr","127.0.0.1")
+        conf.set("setting","s_port",35000)
+        conf.write(f)
+        f.close()
+        print "Setup ini file please restart"
+        exit()
+    
+    ADDRESS = conf.get("setting","s_addr")
+    PORT_LISTEN = conf.getint("setting","s_port")
+    PORT_SEND = PORT_LISTEN +1
     ADDR_LISTEN = (ADDRESS,PORT_LISTEN)
     ADDR_SENDING = (ADDRESS,PORT_SEND)
     ROOM_NUM = 10
@@ -81,7 +117,7 @@ if __name__ == "__main__":
     listenqueue = q.Queue(60)
     s = mp.Thread(target = starting, args = (commandqueue,ADDR_LISTEN,ADDR_SENDING,ROOM_NUM,sendingqueue,listenqueue))
     listenP = mp.Thread(target = listening, args = (listenqueue, ADDR_LISTEN))
-    sendingP = mp.Thread(target = sending, args = (sendingqueue, ADDR_SENDING))
+    sendingP = mp.Thread(target = sending, args = (sendingqueue, ADDR_SENDING,commandqueue))
     #print local_cmd
     s.start()
     listenP.start()

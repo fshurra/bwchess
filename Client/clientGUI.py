@@ -5,7 +5,10 @@ from copy import deepcopy
 from time import sleep
 from bwgame import BWGame
 from clientclass import ClientGame
+import ConfigParser
 #from curses.ascii import DC1
+
+#def writeBlankcfg():
 
 class WXThread(threading.Thread):
     def __init__(self,threadnum,func,*funcargs):
@@ -30,7 +33,7 @@ class new_input(wx.TextCtrl):
         
 class new_std(wx.TextCtrl):
     def __init__(self,parent, id=-1, value='', pos=wx.DefaultPosition, size=wx.DefaultSize, name=wx.TextCtrlNameStr,background = "black", wordcolour = "yellow"):
-        style =  wx.TE_MULTILINE | wx.TE_RICH #| wx.TE_READONLY
+        style =  wx.TE_MULTILINE | wx.TE_RICH | wx.TE_READONLY
         wx.TextCtrl.__init__(self, parent = parent, id= id, value = value, pos=pos, size=size, style=style, validator=wx.DefaultValidator, name=name)
         self.setStyle(background,wordcolour)
         self.old_stdout=sys.stdout
@@ -39,8 +42,14 @@ class new_std(wx.TextCtrl):
         sys.stderr = self
 
     def write(self,output):
-        output=output.replace('\n','\r\n')
-        self.AppendText(output)
+        try:
+            output=output.replace('\n','\r\n')
+            self.AppendText(output)
+        except Exception as e:
+            #print e
+            #print "err"
+            a = 1
+        return 
         
     def setStyle(self,background = "black", wordcolour = "yellow"):
         self.SetBackgroundColour(background)
@@ -50,7 +59,22 @@ class new_std(wx.TextCtrl):
         sys.stdout=self.old_stdout
         sys.stderr=self.old_stderr
 
-
+class info_display(wx.TextCtrl):
+    def __init__(self,parent, id=-1, value='', pos=wx.DefaultPosition, size=wx.DefaultSize, name=wx.TextCtrlNameStr,background = "black", wordcolour = "yellow"):
+        style =  wx.TE_MULTILINE | wx.TE_READONLY
+        wx.TextCtrl.__init__(self, parent = parent, id= id, value = value, pos=pos, size=size, style=style, validator=wx.DefaultValidator, name=name)
+        #self.setStyle(background,wordcolour)
+    
+    def refresh(self,info):
+        info = list(info)
+        #info = info.sort(key=lambda x: x[0])
+        str = ""
+        for line in info:
+            line = '\t'.join(line)
+            str += line+"\n"
+        self.Clear()
+        self.AppendText(str) 
+            
 
 class Board(wx.Window):
     def __init__(self,parent,id,size = (300,300),pos = (0,0),gameinfo = [],frame = None):
@@ -105,8 +129,9 @@ class Board(wx.Window):
         
     def PaintNow(self,data):
         #print "print now"
-        dc = wx.ClientDC(self)
+        dc = wx.BufferedDC(wx.ClientDC(self))
         self.draw(dc,data)
+        
     def OnPaint(self,evt):
         dc = wx.BufferedPaintDC(self)
         self.draw(dc,self.gameinfo)
@@ -115,23 +140,146 @@ class MainFrame(wx.Frame):
     def __init__(self,parent,id,title,style = wx.DEFAULT_FRAME_STYLE, size = (600,450),pos = (100,100),queue = [],game = None):
         wx.Frame.__init__(self,parent = parent,id = id,title = title,style= style,size = size, pos = pos)
         panel = wx.Panel(self,-1)
+        self.SetIcon(wx.Icon(name='./pic/b.ico', type=wx.BITMAP_TYPE_ICO))
         self.commandqueue = queue
         self.game = game
         self.board = Board(panel,-1,size = (275,274),pos = (0,0),gameinfo = self.game.getgame(),frame = self)
-        self.bu_click = wx.Button(panel,-1,"Test",size = (100,30),pos = (350,370))
+        #self.bu_click = wx.Button(panel,-1,"Test",size = (100,30),pos = (350,370))
         self.shower = new_std(parent = panel,size = (325,274),pos = (275,0))
         self.inputer = new_input(parent = panel,id = -1,value = '',size = (480,20),pos = (100,280))
         self.text1 = wx.StaticText(panel,-1,"Command:",size = (65,20),pos = (20,280))
         self.color = 1
-        
+        self.currentinfo = {
+                            "Logined" : False,
+                            "Roomname" : "",
+                            "Playing" : False, 
+                            "Id" : -1,
+                            "Round" : 0
+                        
+                            }
         self.myturn = None
         self.clock = wx.Timer(self)
-        self.Bind(wx.EVT_BUTTON,self.OnClick_bu_click,self.bu_click)
+        self.info = wx.StaticText(parent = panel,id = -1,label = "",pos = (0,300),size = (220,100))
+        #self.Bind(wx.EVT_BUTTON,self.OnClick_bu_click,self.bu_click)
         self.Bind(wx.EVT_TEXT_ENTER,self.OnEnterText,self.inputer)
         self.Bind(wx.EVT_TIMER,self.OnTimer,self.clock)
+        
+        
+        
+        self.bu_login = wx.Button(panel,-1,"Login/out",size = (100,30),pos = (490,300))
+        self.bu_games = wx.Button(panel,-1,"Games",size = (100,30),pos = (380,300))
+        self.bu_list = wx.Button(panel,-1,"List",size = (100,30),pos = (380,350))
+        self.bu_join = wx.Button(panel,-1,"Join/Leave",size = (100,30),pos = (270,350))
+        self.bu_setting = wx.Button(panel,-1,"Setting",size = (100,30),pos = (490,350))
+        self.bu_msg = wx.Button(panel,-1,"Message",size = (100,30),pos = (270,300))
+        self.Bind(wx.EVT_BUTTON,self.OnClick_bu_login,self.bu_login)
+        self.Bind(wx.EVT_BUTTON,self.OnClick_bu_games,self.bu_games)
+        self.Bind(wx.EVT_BUTTON,self.OnClick_bu_list,self.bu_list)
+        self.Bind(wx.EVT_BUTTON,self.OnClick_bu_join,self.bu_join)
+        self.Bind(wx.EVT_BUTTON,self.OnClick_bu_setting,self.bu_setting)
+        self.Bind(wx.EVT_BUTTON,self.OnClick_bu_msg,self.bu_msg)
+        
+        self.bu_retry = wx.Button(panel,-1,"Retry",size = (50,30),pos = (220,350))
+        self.Bind(wx.EVT_BUTTON,self.OnClick_bu_retry,self.bu_retry)
+        
         self.clock.Start(100)
+        self.n =0
+        #self.ShowCurrentInfo()
+        
+    def OnClick_bu_login(self,evt):
+        if self.currentinfo["Logined"]:
+            self.commandqueue.put("logout")
+        else:
+            conf = ConfigParser.ConfigParser()
+            conf.read("client.ini")
+            ADDR = conf.get("setting","s_addr")
+            LISTEN = conf.get("setting","s_port")
+            unameD = wx.TextEntryDialog(self,message = "enter yourname (no space or \"|\" allowed)",caption = u"login", style = wx.OK)
+            if unameD.ShowModal() == wx.ID_OK:
+                if unameD.GetValue() != "":
+                    uname = unameD.GetValue()
+                    uname = str(uname)
+                else:
+                    uname = "None"
+            self.commandqueue.put("login "+uname+" "+ADDR+" "+LISTEN)
+    def OnClick_bu_games(self,evt):
+        self.commandqueue.put("games")
+    def OnClick_bu_list(self,evt):
+        self.commandqueue.put("list")
+    def OnClick_bu_join(self,evt):
+        
+        if self.currentinfo["Roomname"] != "":
+            self.commandqueue.put("leave")
+            return 
+        unameD = wx.TextEntryDialog(self,message = "enter roomname (no space or \"|\" allowed)",caption = u"join", style = wx.OK)
+        if unameD.ShowModal() == wx.ID_OK:
+            if unameD.GetValue() != "":
+                name = unameD.GetValue()
+                name = str(name)
+            else:
+                name = "None"
+        self.commandqueue.put("join "+name)
+        return 
+    def OnClick_bu_setting(self,evt):
+        wx.MessageBox(u"Please close the game and change the client.ini ",caption = u"Setting",style = wx.OK)
+    def OnClick_bu_msg(self,evt):
+        unameD = wx.TextEntryDialog(self,message = "enter messagecontent (no  \"|\" allowed)",caption = u"Message", style = wx.OK)
+        if unameD.ShowModal() == wx.ID_OK:
+            if unameD.GetValue() != "":
+                name = unameD.GetValue()
+                name = str(name)
+            else:
+                name = "None"
+        command = "msg "+name+ " "
+        unameD = wx.TextEntryDialog(self,message = "enter destination (leave empty to send to all,use \"\,\" in the middle) (no  \"|\" allowed)",caption = u"Message", style = wx.OK)
+        if unameD.ShowModal() == wx.ID_OK:
+            if unameD.GetValue() != "":
+                name = unameD.GetValue()
+                name = str(name)
+            else:
+                name = "-1"
+        command = command+name
+        self.commandqueue.put(command)
+        
+        
+    def OnClick_bu_retry(self,evt):
+        self.ShowCurrentInfo()
+        self.commandqueue.put("retry")
+         
+    def getcurrentinfo(self):
+        info = ""
+        for key in self.currentinfo:
+            if key == "Roomname":
+                info += "Room"
+            else:
+                info += key
+            info += "\t\t"+str(self.currentinfo[key])+"\n"
+        color = self.game.getmycolor()
+        colorinfo = ''
+        turninfo = ''
+        if color == -1:
+            colorinfo = "Color\t\tNone\n"
+            info += colorinfo
+            return info
+        elif color == 1:
+            colorinfo = "Color\t\tBlack\n"
+        elif color == 0:
+            colorinfo = "Color\t\tWhite\n"
+        if self.currentinfo["Round"]%2 == color:
+            turninfo = "Myturn\n"
+        else:
+            turninfo = "NotMyturn\n"
+        info += colorinfo + turninfo
+        type(info)
+        return info
+    
+    def ShowCurrentInfo(self):
+        self.currentinfo = self.game.getinfo()
+        self.info.SetLabel(self.getcurrentinfo())
     
     def OnEnterText(self,evt):
+    
+        self.ShowCurrentInfo()
         command = self.inputer.GetValue()
         if command == '':
             return 0
@@ -144,13 +292,21 @@ class MainFrame(wx.Frame):
     def OnTimer(self,evt):
         #pass
         self.board.PaintNow(self.game.getgame())
+        if self.n < 6:
+            self.n += 1
+        else:
+            self.n = 0
+            self.ShowCurrentInfo()
+        #self.ShowCurrentInfo()
+        #self.currentinfo = self.game.getinfo()
         
     def OnClick_bu_click(self,evt):
         #self.refreshinfo()
-        pass
+        self.ShowCurrentInfo()
         #self.board.PaintNow(self.game.getgame())
         
     def put(self,x,y):
+        self.ShowCurrentInfo()
         color = self.game.getmycolor()
         self.commandqueue.put("put "+str(x)+" "+str(y)+" "+str(color))
 

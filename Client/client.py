@@ -1,3 +1,4 @@
+
 import threading as mp
 import multiprocessing as q
 from time import sleep
@@ -5,13 +6,13 @@ from udpnetwork import NetworkUDP
 from clientclass import Clientissue as ccmd
 import wx
 import clientGUI as gui
-
+import ConfigParser
 
 def listening(queue,ADDR_LISTEN,lock):
     net = NetworkUDP(ADDR_LISTEN)
     while True:
         msgdata, remote_addr = net.listening()
-        print "GOT:",msgdata
+        #print "GOT:",msgdata
         msgdata = msgdata.split('|')
         if msgdata[-1] == '!':
             msgdata.append(remote_addr)
@@ -22,7 +23,7 @@ def listening(queue,ADDR_LISTEN,lock):
             break
     return 
 # the udpSocket sending
-def sending(queue,ADDR_SENDING,lock):
+def sending(queue,ADDR_SENDING,lock,commandqueue):
     net = NetworkUDP(ADDR_SENDING)
     #print queue
     while True:
@@ -35,9 +36,13 @@ def sending(queue,ADDR_SENDING,lock):
                 lock.release()
                 #print "sending ",msg
                 if net.sending(msg[0], msg[1]) == False:
-                    print "send",msg,"failed"
-                else:
-                    print "Send Success",msg
+                    #print "send",msg,"failed"
+                    #lock.release()
+                    print "Lost Connection From the Server"
+                    commandqueue.put("reset-all")
+                
+                    #print "Send Success",msg
+                    
                 if msg[0][0] == '@':
                     break
             else:
@@ -51,6 +56,7 @@ def starting(queue,ADDR_LISTEN,ADDR_SENDING,listenqueue,sendingqueue,commandLock
     print sendingqueue
     while True:
         sleep(0.5)
+        cmd.game_refreshinfo()
         if commandLock.acquire(1) == True:
             if queue.empty() == False:
                 command = queue.get()
@@ -85,8 +91,28 @@ def starting(queue,ADDR_LISTEN,ADDR_SENDING,listenqueue,sendingqueue,commandLock
 
 
 if __name__ == "__main__":
-    ADDR = "127.0.0.1"
-    LISTEN = 40000
+    try:
+        f = open("client.ini","r")
+        f.close()
+        conf = ConfigParser.ConfigParser()
+        conf.read("client.ini")
+        
+    except Exception as e:
+        f = open("client.ini","w")
+        conf = ConfigParser.ConfigParser()
+        conf.add_section("setting")
+        conf.set("setting","local_addr","127.0.0.1")
+        conf.set("setting","local_port",40000)
+        conf.set("setting","s_addr","127.0.0.1")
+        conf.set("setting","s_port",35000)
+        conf.write(f)
+        f.close()
+        #wx.MessageBox(u"Setting up the ini file please restart",caption = u"Notice",style = wx.OK)
+        exit()
+    
+    
+    ADDR = conf.get("setting","local_addr")
+    LISTEN = conf.getint("setting","local_port")
     SEND = LISTEN + 1
     ADDR_LISTEN = (ADDR,LISTEN)
     ADDR_SENDING = (ADDR,SEND)
@@ -99,7 +125,7 @@ if __name__ == "__main__":
     commandLock = mp.Lock()
     game = gui.ClientGame()
     listenP = mp.Thread(target = listening, args = (listenqueue, ADDR_LISTEN,listenLock))
-    sendingP = mp.Thread(target = sending, args = (sendingqueue, ADDR_SENDING,sendLock))
+    sendingP = mp.Thread(target = sending, args = (sendingqueue, ADDR_SENDING,sendLock,commandqueue))
     s = mp.Thread(target = starting, args = (commandqueue,ADDR_LISTEN,ADDR_SENDING,listenqueue,sendingqueue,commandLock,sendLock,listenLock,game))
     s.start()
     listenP.start()
@@ -121,6 +147,8 @@ if __name__ == "__main__":
     app = gui.BWchessApp(commandqueue,game)
     print "Client Starting Success"
     app.MainLoop()
+    
+    commandqueue.put("logout")
     
     commandqueue.put("stop")
     stopmsg = ["@",ADDR_LISTEN]

@@ -3,6 +3,28 @@
 import json
 import bwgame as bw
 import random
+
+def illegalCommand():
+    print "Player not loggedin"
+    return
+
+def checkPlayerexist(func):
+    def warpper(*args,**kw):
+        clAss = args[0]
+        msg = args[1]
+        addr = msg[-1]
+        print addr
+        addr = list(addr)
+        addr[1] = addr[1] -1
+        addr = tuple(addr)
+        info = clAss.playerexist(addr)
+        if info == -1:
+           #clAss.send("KO|!",addr)
+            return illegalCommand()
+        else:
+            return func(*args,**kw)
+    return warpper
+
 class ServerGame(bw.BWGame):
     def __init__(self):
         bw.BWGame.__init__(self)
@@ -177,7 +199,8 @@ class Serverissue:
                            "closegame" : self.closegame,
                            "reset-all" : self.resetall,
                            'kick' : self.kickplayer,
-                           "showgame" : self.showgame
+                           "showgame" : self.showgame,
+                           "disconnect" : self.disconnect
                           }
         #some default message to send
         self.errormsg = {
@@ -189,13 +212,14 @@ class Serverissue:
                          }
 
     #game play info
+    @checkPlayerexist
     def server_put(self,*args):
         msg = args[0]
         x = int(msg[1])
         y = int(msg[2])
         color = int(msg[3])
-        count = int(msg[4])
-        roomname = msg[5]
+        count = int(msg[5])
+        roomname = msg[4]
         index = self.gameexist(roomname)
         self.gameinfo[index][1].put(x,y,color)
         self.gameinfo[index][1].addcount()
@@ -203,24 +227,25 @@ class Serverissue:
         msg = "|".join(msg)
         self.send(msg,self.gameinfo[index][1].getoppoaddr(color))
         return 0
-        
+    @checkPlayerexist    
     def server_pass(self,*args):
         msg = args[0]
         x = int(msg[1])
         y = int(msg[2])
         color = int(msg[3])
-        count = int(msg[4])
-        roomname = msg[5]
+        count = int(msg[5])
+        roomname = msg[4]
         index = self.gameexist(roomname)
         self.gameinfo[index][1].put(-1,-1,color)
         self.gameinfo[index][1].addcount()
         msg[-1] = "!"
         msg = "|".join(msg)
-        self.send(msg,self.gameinfo[index][1].getoppoaddr(color))
         if self.gameinfo[index][1].isDoublePass():
             for id in self.gameinfo[index][1].getserverplayer():
                 addr = self.idtoinfo[id][0]
                 self.send("END|!",addr)
+        else:
+            self.send(msg,self.gameinfo[index][1].getoppoaddr(color))
         return 0
         
     #check all games every time
@@ -248,7 +273,9 @@ class Serverissue:
                 if game.isPlaying():
                     #check retry flag
                     if game.needRetry():
-                        game.exchangeblackandwhite()
+                        players = game.getserverplayer()
+                        id1,id0 = self.randomselect(players)
+                        game.setblackandwhite(id1,id0)
                         game.game_reset()
                         game.start(self.send)        
                 else:
@@ -263,14 +290,19 @@ class Serverissue:
                 if game.isPlaying():
                     for player in game.getserverplayer():
                         if player != -1:
-                            addr = self.idtoinfo[player][0]
-                            self.send("MSG|The another player has left, You win!|!", addr)
+                            try:
+                                addr = self.idtoinfo[player][0]
+                                self.send("MSG|The another player has left!|!", addr)
+                                self.send("END|1|!",addr)
+                            except Exception as e:
+                                print e
+                            
                     game.game_reset()    
         
         return
     
-    
     #NETWORK FUNC
+    @checkPlayerexist
     def server_retry(self,*args):
         msg = args[0]
         id = msg[1]
@@ -281,9 +313,9 @@ class Serverissue:
         if roomnum == -1:
             self.send("MSG|No such Room"+roomname+"|!",addr)
         else:
-            self.gameinfo[roomname][1].setretryflag(id)
-            for players in self.gameinfo[roomname][1].getserverplayer():
-                taddr = self.idtoinfo[id][0]
+            self.gameinfo[roomnum][1].setretryflag(id)
+            for players in self.gameinfo[roomnum][1].getserverplayer():
+                taddr = self.idtoinfo[players][0]
                 self.send("MSG|Player "+str(id)+" want to retry|!",taddr)
         return 0
         
@@ -315,6 +347,7 @@ class Serverissue:
         #print self.errormsg["LOGIN_SUCCESS"]
         return 0
     
+    @checkPlayerexist
     def server_logout(self,*args):
         msg = args[0]
         id = msg[1]
@@ -324,6 +357,7 @@ class Serverissue:
         self.send(self.errormsg["LOGOUT_SUCCESS"],addr)
         return 0
     
+    @checkPlayerexist
     def server_list(self,*args):
         msg = args[0]
         addr = msg[-1]
@@ -331,12 +365,15 @@ class Serverissue:
         for key in self.idtoinfo:
             item = self.idtoinfo[key][1:]
             item.append(key)
+            item.pop(1)
             plist.append(item)
+            #plist.pop(1)
         plist_json = json.dumps(plist)
         self.send("JSON|"+plist_json+"|!",self.addr_change(addr))  
         print 'list'
         return 0
-        
+    
+    @checkPlayerexist    
     def server_games(self,*args):
         msg = args[0]
         addr = msg[-1]
@@ -352,6 +389,7 @@ class Serverissue:
         print 'games'
         return 0
         
+    @checkPlayerexist
     def server_join(self,*args):
         #print 'join'
         msg = args[0]
@@ -369,6 +407,7 @@ class Serverissue:
                 self.send("MSG|Join Failed|!",addr)
         return 0
     
+    @checkPlayerexist
     def server_leave(self,*args):
         msg = args[0]
         id = msg[1]
@@ -390,6 +429,13 @@ class Serverissue:
         sid = msg[2]
         saddr = self.idtoinfo[sid][0]
         #content = "From player"+str(sid)+":"+content
+        dids = msg[3]
+        if dids == "-1":
+            for id in self.id:
+                addr = self.idtoinfo[id][0]
+                self.send("MSG|"+content+"|"+str(sid)+"|!",addr)
+            return 
+        
         dids = msg[3].split(",")
         for did in dids:
             if did not in self.idtoinfo:
@@ -404,6 +450,9 @@ class Serverissue:
     #ret = local_cmd[command](sendingqueue,listenqueue,playerlist,gameinfo,ADDR_LISTEN,ADDR_SENDING,ROOM_NUM,n)
     def resetall(self,*args):
         #UNFINISHED
+        for id in self.id:
+            addr = self.idtoinfo[id][0]
+            self.kickplayer([0,id],0)
         self.playerlist=[]
         self.idtoinfo = {}
         self.gameinfo = []
@@ -411,7 +460,7 @@ class Serverissue:
     
     def kickplayer(self,*args):
         msg = args[0]
-        playerid = str(args[1])
+        playerid = str(msg[1])
         if playerid not in self.idtoinfo:
             print 'Not Exist ',playerid
             return 0
@@ -477,10 +526,38 @@ class Serverissue:
         #self.playerlist.append(1000)
         print self.gameinfo,self.playerlist,self.idtoinfo,self.id
         return 0
-
+    
+    
+    def disconnect(self,*args):
+        print "Here"
+        print args
+        msg = args[0]
+        playeraddr = (msg[1],int(msg[2]))
+        playerid = None
+        for player in self.idtoinfo:
+            if playeraddr in self.idtoinfo[player]:
+                playerid = player
+                break
+        if playerid not in self.idtoinfo:
+            print 'Not Exist ',playerid
+            return 0
+        else:
+            self.send(self.errormsg["KICKED_OUT"],self.idtoinfo[playerid][0])
+            self.delplayer(playerid)
+            print 'Kicked Out',playerid
+            return 0
     #INTERNAL FUNC
+    def checkallconnection(self):
+        #for id in self.idtoinfo:
+        #    addr = idtoinfo()
+        pass
     
     def delplayer(self,id):
+        for room in self.gameinfo:
+            detail = room[1]
+            if id in room[1].getserverplayer():
+                room[1].exit(id,self.idtoinfo[id])
+                
         del self.idtoinfo[id]
         self.id.pop(self.id.index(id))
         return 0

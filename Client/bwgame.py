@@ -53,7 +53,7 @@ class BWGame:
         self.prevgame = copy.deepcopy(self.game)
         if x == -1:
             #PASS
-            print "PASS"
+            #print "PASS"
             self.count+=1
             count = self.count
             self.hist.append([count,x,y,color,"PASS"])
@@ -113,7 +113,7 @@ class BWGame:
         # illegal point will return other
         posinf = self.game[x][y]
         turnings = self.checkturning(x, y, color)
-        print turnings
+        #print turnings
         if turnings == 0:
             return 2
         return posinf
