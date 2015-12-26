@@ -3,12 +3,72 @@
 import json
 import bwgame as bw
 
+# Here are for Annotation usage
+def unLogin(*args):
+    print "You have to login first"
+    return 0
+def unRoom(*args):
+    print "You have not join a room"
+    return 0
+def unPlaying(*args):
+    print "You are not playing now"
+    return 0
+
+def checkLogin(func):
+    def wrapper(*args,**kw):
+        currentinfo = args[0].localgame.getinfo()
+        #print args
+        if currentinfo["Logined"]:
+            return func(*args,**kw)
+        else:
+            return unLogin()
+    return wrapper 
+
+def checkPlaying(func):
+    def wrapper(*args,**kw):
+        currentinfo = args[0].localgame.getinfo()
+        #print args
+        if currentinfo["Playing"]:
+            return func(*args,**kw)
+        else:
+            return unPlaying()
+    return wrapper 
+
+def checkRoom(func):
+    def wrapper(*args,**kw):
+        currentinfo = args[0].localgame.getinfo()
+        #print args
+        if currentinfo["Roomname"] != "":
+            return func(*args,**kw)
+        else:
+            return unRoom()
+    return wrapper 
+    
+
 
 class ClientGame(bw.BWGame):
     def __init__(self):
         bw.BWGame.__init__(self)
         self.mycolor = -1
-        
+        self.passcount = 0
+        self.currentinfo = {
+                            "Logined" : False,
+                            "Roomname" : "",
+                            "Playing" : False, 
+                            "Id" : -1,
+                            "Round" : 0
+                            }
+    
+    def refreshinfo(self,*args):
+        self.currentinfo["Logined"] = args[0]
+        self.currentinfo["Roomname"] = args[1]
+        self.currentinfo["Playing"] = args[2]
+        self.currentinfo["Id"] = args[3]
+        self.currentinfo["Round"] = self.count
+    
+    def getinfo(self):
+        return self.currentinfo
+    
     def checkCount(self,count):
         if count == self.count:
             return True
@@ -77,7 +137,7 @@ class ClientGame(bw.BWGame):
                 if self.game[i][j] == int(self.mycolor):
                     me += 1
                 else:
-                    oppo += 0
+                    oppo += 1
         print "Your Point: ",me
         print "Oppo Point: ",oppo
         if me > oppo:
@@ -158,46 +218,60 @@ class Clientissue:
                            "msg" : self.client_msg,
                            "retry":self.client_retry,
                            "put": self.client_put,
-                           "pass":self.client_pass
+                           "pass":self.client_pass,
+                           "reset-all":self.resetall
                           }
 
     #check all games every time
+    def game_refreshinfo(self):
+        self.localgame.refreshinfo(self.logined,self.inroom,self.playing,self.id)
     #game put pass end starts
     def receive_end(self,*args):
         self.localgame.OnEnd()
+        msg = args[0]
+        try:
+            info = msg[1]
+            if info == '1':
+                self.playing = False
+        except:
+            return 
+        return 
         
     def receive_pass(self,*args):
         msg = args[0]
         x = int(msg[1])
         y = int(msg[2])
         color = int(msg[3])
-        count = int(msg[4])
+        roomname = msg[4]
+        count = int(msg[5])
         #if self.localgame.checkCount(count) == False:
             #print "Wrong Leave Now"
             #self.client_leave()
             #return 0
         if self.localgame.rput(-1,-1,color):
-            print "Round :",count,"Pass"
+            print "Round :",count,"PASS"
         if self.localgame.needPass():
-            print "PASS"
-            #self.client_pass([0,-1,-1,-1,-1])
+            #print "PASS"
+            self.client_pass([0,-1,-1,-1,-1])
+            
             
     def receive_put(self,*args):
         msg = args[0]
         x = int(msg[1])
         y = int(msg[2])
         color = int(msg[3])
-        count = int(msg[4])
+        roomname = msg[4]
+        count = int(msg[5])
         #if self.localgame.checkCount(count) == False:
             #print "Wrong Leave Now"
             #self.client_leave()
             #return 0
         if self.localgame.rput(x,y,color):
-            print "Round :",count,x,y,color
+            print "Round :",count,"POINT:",x,y,color
         if self.localgame.needPass():
-            print "PASS"
+            #print "PASS"
             self.client_pass([0,-1,-1,-1,-1])
-        
+
     def client_pass(self,*args):
         msg = args[0]
         x = int(msg[1])
@@ -210,7 +284,7 @@ class Clientissue:
             self.send("PASS|"+"-1"+"|"+"-1"+"|"+str(self.localgame.getmycolor())+"|"+roomname+"|"+str(count)+"|#",self.server_addr)
         else:
             return 0
-        
+    @checkPlaying    
     def client_put(self,*args):
         msg = args[0]
         x = int(msg[1])
@@ -244,6 +318,7 @@ class Clientissue:
         msg = args[0]
         print "Leaved",self.inroom
         self.inroom = ""
+        self.playing = False
         return 0
     
     def receive_login(self,*args):
@@ -257,6 +332,9 @@ class Clientissue:
     def show_json(self,*args):
         msg = args[0]
         info = json.loads(msg[1])
+        if len(info) == 0:
+            print 'None'
+            return 0
         for line in info:
             print line
         return 0
@@ -279,6 +357,7 @@ class Clientissue:
     
     #LOCAL OPERATION
     # login name ip port
+    @checkPlaying
     def client_retry(self,*args):
         msg = args[0]
         self.send("RETRY|"+self.id+"|"+self.inroom+"|#",self.server_addr)
@@ -295,7 +374,7 @@ class Clientissue:
         self.send("LOGIN|"+name+"|#",server_addr)
         self.server_addr = server_addr
         return 1
-    
+    @checkLogin
     def client_logout(self,*args):
         msg = args[0]
         id = self.id
@@ -307,32 +386,42 @@ class Clientissue:
             self.resetall()
         return 0
     
+    @checkLogin
     def client_list(self,*args):
         print "Show the list:"
         self.send("LIST|#",self.server_addr)
+        print "Name|Id"
         return 0
-        
+    
+    @checkLogin
     def client_games(self,*args):
         print "Show the games:"
         self.send("GAMES|#",self.server_addr)
+        print "[Roomname,[[Playerid(-1 = empty),status]]"
         return 0
         
+    @checkLogin    
     def client_join(self,*args):
         msg = args[0]
         name = msg[1]
         self.send("JOIN|"+str(self.id)+"|"+name+"|#",self.server_addr)
         return 0
-    
+    @checkRoom
     def client_leave(self,*args):
         msg = args[0]
         #name = msg[1]
         self.send("LEAVE|"+str(self.id)+"|"+self.inroom+"|#",self.server_addr)
+        #self.playing = False
         return 0
     # msg content d1,d2,d3
+    @checkLogin
     def client_msg(self,*args):
         msg = args[0]
-        content = msg[1]
-        dids = msg[2]
+        content = ""
+        dids = msg[-1]
+        newmsg = msg[1:-1]
+        for word in newmsg:
+            content += word+" "
         sid = self.id
         message = "MSG|"+content+"|"+sid+"|"+dids+"|#"
         self.send(message,self.server_addr)
@@ -346,7 +435,7 @@ class Clientissue:
         #self.send("@",self.ADDR_L)
         return '@'
     
-    def resetall(self):
+    def resetall(self,*args):
         self.logined = False
         self.inroom = ""
         self.playing = False
