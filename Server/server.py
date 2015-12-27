@@ -83,6 +83,7 @@ def starting(queue,ADDR_LISTEN,ADDR_SENDING,ROOM_NUM,sendingqueue,listenqueue):
             # msg ==> list(msg) ==> msg.append(remote_addr)
             cmd.server_cmd[msg[0]](msg,0)
         cmd.everygame()
+        cmd.checkwatch()
     cmd.resetall()    
     return 0
 # this will be the UI of the server

@@ -4,6 +4,7 @@ import json
 import bwgame as bw
 import random
 
+
 def illegalCommand():
     print "Player not loggedin"
     return
@@ -173,6 +174,10 @@ class Serverissue:
         self.n = n
         self.id = []
         self.idtoinfo = {}
+        self.iswatching = False
+        self.lastcount = 0
+        self.watchingroom = None
+        self.watchinggame = None
         #emptygame["name",[id1,id2],[color1,color2],[retry1,retry2],roundnow,[the list of operation]]
         #self.emptygame = ["NA",[-1,-1],[8,8],[0,0],0,[]]
         #HERE ARE THE NETWORKCMDS
@@ -200,7 +205,11 @@ class Serverissue:
                            "reset-all" : self.resetall,
                            'kick' : self.kickplayer,
                            "showgame" : self.showgame,
-                           "disconnect" : self.disconnect
+                           "disconnect" : self.disconnect,
+                           "watch" :self.watch,
+                           "stop-watch" : self.stopwatch,
+                           "list" : self.list,
+                           "games" : self.games
                           }
         #some default message to send
         self.errormsg = {
@@ -211,6 +220,65 @@ class Serverissue:
                          "LOGINED" : 'MSG|You Have Already Login!|!'
                          }
 
+    #last changes
+    def checkwatch(self):
+        if self.iswatching == False:
+            return 
+        
+        else:
+            game = self.watchinggame
+            roomname = self.watchingroom
+            if game.getround_now() ==self.lastcount:
+                return 
+            else:
+                self.lastcount = game.getround_now()
+                game.show()
+                print game.player
+                print "Room:",roomname
+        return 
+    def getroom(self,id):
+        for game in self.gameinfo:
+            roomname = game[0]
+            players = game[1].getserverplayer()
+            if id in players:
+                return roomname
+        else:
+            return "IDLE"
+    def list(self,*args):
+        msg = args[0]
+        for id in self.id:
+            name = self.idtoinfo[id][1]
+            status = self.getroom(id)
+            print "ID: ",id,"Name: ",name,"InRoom: ",status
+    def games(self,*args):
+        msg = args[0]
+        for game in self.gameinfo:
+            roomname = game[0]
+            roominfo = game[1].getinfo()
+            playerinfo = roominfo[0]
+            status = roominfo[1]
+            print "Room:",roomname,"players:",playerinfo,"status",status
+        return 
+    def watch(self,*args):
+        msg = args[0]
+        roomname = msg[1]
+        index = self.gameexist(roomname)
+        if index != -1:
+            game = self.gameinfo[index][1]
+        else:
+            return 
+        print "start watching"
+        self.watchingroom = roomname
+        self.watchinggame = game
+        self.lastcount = game.getround_now()
+        self.iswatching = True
+    def stopwatch(self,*args):
+        msg = args[0]
+        self.iswatching = False
+        self.watchingroom = None
+        self.lastcount = 0
+        self.watchinggame = None
+        print "Stopped watching"
     #game play info
     @checkPlayerexist
     def server_put(self,*args):
@@ -221,6 +289,8 @@ class Serverissue:
         count = int(msg[5])
         roomname = msg[4]
         index = self.gameexist(roomname)
+        if index == -1:
+            return
         self.gameinfo[index][1].put(x,y,color)
         self.gameinfo[index][1].addcount()
         msg[-1] = "!"
@@ -236,6 +306,8 @@ class Serverissue:
         count = int(msg[5])
         roomname = msg[4]
         index = self.gameexist(roomname)
+        if index == -1:
+            return
         self.gameinfo[index][1].put(-1,-1,color)
         self.gameinfo[index][1].addcount()
         msg[-1] = "!"
@@ -362,12 +434,14 @@ class Serverissue:
         msg = args[0]
         addr = msg[-1]
         plist = []
-        for key in self.idtoinfo:
-            item = self.idtoinfo[key][1:]
-            item.append(key)
-            item.pop(1)
-            plist.append(item)
+        for id in self.id:
+            name = self.idtoinfo[id][1]
+            status = self.getroom(id)
+            name = "Name: "+name
+            id = "ID:" + id
+            status = "Room: "+status
             #plist.pop(1)
+            plist.append([id,name,status])
         plist_json = json.dumps(plist)
         self.send("JSON|"+plist_json+"|!",self.addr_change(addr))  
         print 'list'
@@ -380,10 +454,11 @@ class Serverissue:
         plist = []
         #emptygame["name",[id1,id2],[color1,color2],[retry1,retry2],roundnow,[the list of operation]]
         for game in self.gameinfo:
-            info = []
-            info.append(game[0])
-            info.append(game[1].getinfo())
-            plist.append(info)
+            roomname = game[0]
+            roominfo = game[1].getinfo()
+            playerinfo = roominfo[0]
+            status = roominfo[1]
+            plist.append(["Room: "+roomname,"player: "+str(playerinfo),"stat: "+status])
         plist_json = json.dumps(plist)
         self.send("JSON|"+plist_json+"|!",self.addr_change(addr))  
         print 'games'
@@ -478,6 +553,7 @@ class Serverissue:
         
     def closegame(self,*args):
         command = args[0]
+        self.stopwatch()
         try:
             name = command[1]
         except IndexError:

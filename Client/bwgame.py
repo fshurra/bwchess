@@ -179,8 +179,8 @@ class BWGame:
     def show(self):
         #for debugging usage (for server using)
         showing = copy.deepcopy(self.game)
-        for line in showing:
-            print line
+        #for line in showing:
+         #   print line
         for i in range(len(showing)):
             for j in range(len(showing[i])):
                 if showing[i][j] == -1:
