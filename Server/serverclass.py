@@ -209,7 +209,8 @@ class Serverissue:
                            "watch" :self.watch,
                            "stop-watch" : self.stopwatch,
                            "list" : self.list,
-                           "games" : self.games
+                           "games" : self.games,
+                           "msg" : self.msg
                           }
         #some default message to send
         self.errormsg = {
@@ -221,6 +222,34 @@ class Serverissue:
                          }
 
     #last changes
+    def msg(self,*args):
+        msg = args[0]
+        msg = args[0]
+        content = ""
+        dids = msg[-1]
+        #dids = dids.split(",")
+        newmsg = msg[1:-1]
+        for word in newmsg:
+            content += word+" "
+        message = "MSG|"+content+"|!"
+        #all
+        if dids == "-1":
+            for id in self.id:
+                addr = self.idtoinfo[id][0]
+                self.send("MSG|"+content+"|!",addr)
+            return 
+        
+        dids = dids.split(",")
+        for did in dids:
+            if did not in self.idtoinfo:
+                print "No User",did
+                continue
+            daddr = self.idtoinfo[did][0]
+            if str(daddr) == "-1":
+                print content
+            self.send("MSG|"+content+"|!",daddr)
+        return 0
+    
     def checkwatch(self):
         if self.iswatching == False:
             return 

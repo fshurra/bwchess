@@ -221,7 +221,7 @@ class MainFrame(wx.Frame):
         self.commandqueue.put("join "+name)
         return 
     def OnClick_bu_setting(self,evt):
-        wx.MessageBox(u"Please close the game and change the client.ini ",caption = u"Setting",style = wx.OK)
+        wx.MessageBox(u"Please close the game and change the client.ini \n This Program is By Feng Suo 13307130084",caption = u"Setting",style = wx.OK)
     def OnClick_bu_msg(self,evt):
         unameD = wx.TextEntryDialog(self,message = "enter messagecontent (no  \"|\" allowed)",caption = u"Message", style = wx.OK)
         if unameD.ShowModal() == wx.ID_OK:
