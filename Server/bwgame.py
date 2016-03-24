@@ -1,5 +1,5 @@
 # this is the bwchess game it self
-#the game is a 8x8 one
+# the game is a 8x8 one
 import copy
 
 
@@ -21,7 +21,7 @@ class BWGame:
     show()
     '''
     def __init__(self):
-        self.game = [];
+        self.game = []
         for i in range(8):
             line = []
             for j in range(8):

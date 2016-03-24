@@ -414,6 +414,7 @@ class Clientissue:
         #self.playing = False
         return 0
     # msg content d1,d2,d3
+
     @checkLogin
     def client_msg(self,*args):
         msg = args[0]

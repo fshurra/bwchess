@@ -1,4 +1,4 @@
-#import multiprocessing as mp
+# import multiprocessing as mp
 import threading as mp
 import Queue as q
 from time import sleep
@@ -6,9 +6,6 @@ from udpnetwork import NetworkUDP
 from serverclass import Serverissue as scmd
 import ConfigParser
 # the message list of the whole routine
-
-
-
 # the udpSocket receiving
 def listening(queue,ADDR_LISTEN):
     net = NetworkUDP(ADDR_LISTEN)
@@ -23,6 +20,8 @@ def listening(queue,ADDR_LISTEN):
             break
     return 
 # the udpSocket sending
+
+
 def sending(queue,ADDR_SENDING,commandqueue):
     net = NetworkUDP(ADDR_SENDING)
     while True:
@@ -39,12 +38,14 @@ def sending(queue,ADDR_SENDING,commandqueue):
             break
     return 
 # and starting the server
+
+
 def starting(queue,ADDR_LISTEN,ADDR_SENDING,ROOM_NUM,sendingqueue,listenqueue):
-    #ROOM SETTIGN
+    # ROOM SETTIGN
     playerlist = []
     gameinfo = []
     n = 0
-    #Starting the server
+    # Starting the server
     cmd = scmd(ADDR_LISTEN,ADDR_SENDING,ROOM_NUM,playerlist,gameinfo,sendingqueue,listenqueue,n)
     print "Server Starting Success"
     count = 0
@@ -53,18 +54,18 @@ def starting(queue,ADDR_LISTEN,ADDR_SENDING,ROOM_NUM,sendingqueue,listenqueue):
         count += 1
         if count >= 20:
             count = 0
-            #cmd.checkallconnection()
+            # cmd.checkallconnection()
         cmd.n += 1
         if queue.empty() == False:
             command = queue.get()
             command = command.split()
             if len(command) == 0:
                 continue
-            #print command
+            # print command
             ret = ''
             if command[0] in cmd.local_cmd:
-                #print command
-                #ret = cmd.local_cmd[command[0]](command,0)
+                # print command
+                # ret = cmd.local_cmd[command[0]](command,0)
                 
                 try:
                     ret = cmd.local_cmd[command[0]](command,0)
@@ -75,7 +76,9 @@ def starting(queue,ADDR_LISTEN,ADDR_SENDING,ROOM_NUM,sendingqueue,listenqueue):
                 if ret == '@':
                     break
             else:
-                #print 'Not in'
+                # print 'Not in'
+                # print 'Not in'
+                # print 'Not in'
                 print "Invalid Command"
             
         if listenqueue.empty() == False:
@@ -89,7 +92,7 @@ def starting(queue,ADDR_LISTEN,ADDR_SENDING,ROOM_NUM,sendingqueue,listenqueue):
 # this will be the UI of the server
 if __name__ == "__main__":
     print "Init the server starting"
-    #starting Server issues
+    # starting Server issues
     try:
         f = open("server.ini","r")
         f.close()

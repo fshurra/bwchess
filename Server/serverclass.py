@@ -3,6 +3,7 @@
 import json
 import bwgame as bw
 import random
+# asdasdasdasdasd
 
 
 def illegalCommand():
